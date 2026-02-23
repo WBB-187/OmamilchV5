@@ -1,11 +1,21 @@
+--[[ 
+    OMAMILCH V5 - INTERNAL TURBO (V33)
+    USER: HanfmomentV1 | KEY: HanfmomentV1
+]]
+
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
+-- START-NACHRICHT
+pcall(function()
+    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("omamilch V5 Ist An", "All")
+end)
+
 local Window = Fluent:CreateWindow({
-    Title = "OmamilchV5" .. Fluent.Version,
-    SubTitle = "by bmw3blitz",
+    Title = "omamilch V5 " .. Fluent.Version,
+    SubTitle = "by HanfmomentV1",
     TabWidth = 160,
-    Size = UDim2.fromOffset(460, 360),
-    Acrylic = false, -- Blur ausschalten = false
+    Size = UDim2.fromOffset(460, 400),
+    Acrylic = false,
     Theme = "Amethyst",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
@@ -20,154 +30,120 @@ local Tabs = {
 }
 
 -- Sections
-local VoiceSection = Tabs.Voice:AddSection("Voice")
 local CharacterSection = Tabs.Character:AddSection("Charakter")
 local DropdownSection = Tabs.Misc:AddSection("Teleport")
 local EspSection = Tabs.Misc:AddSection("ESP")
 local ScriptsSection = Tabs.Scripts:AddSection("Scripts")
-local VersionSection = Tabs.Settings:AddSection("Version")
-local CreditSection = Tabs.Settings:AddSection("Credits")
 
--- Spieler Teleport Dropdown
-local selectedPlayerName = nil
+-- --- INTERNE TURBO FLY LOGIK (KEIN PASTEBIN) ---
+local flyMode = false
+local speedLevels = {50, 150, 400, 800} -- Deutlich schneller als das alte Fly
+local currentSpeedIdx = 2
+local flyV, flyG, flyL
 
-local function teleportToPlayer()
-    if not selectedPlayerName or selectedPlayerName == "Select Player" then
-        warn("Kein gültiger Spieler ausgewählt!")
-        return
-    end
-
-    local player = game.Players:FindFirstChild(selectedPlayerName)
-    if player and player.Character then
-        local character = player.Character
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        local playerHRP = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-        if hrp and playerHRP then
-            playerHRP.CFrame = hrp.CFrame  -- Teleportiere dich zum Spieler
-        else
-            warn("HumanoidRootPart nicht gefunden!")
-        end
+local function ToggleFly()
+    local lp = game.Players.LocalPlayer
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    
+    flyMode = not flyMode
+    
+    if flyMode and hrp then
+        flyV = Instance.new("BodyVelocity", hrp)
+        flyV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        flyG = Instance.new("BodyGyro", hrp)
+        flyG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+        
+        flyL = game:GetService("RunService").RenderStepped:Connect(function()
+            char.Humanoid:ChangeState(Enum.HumanoidStateType.Landed) -- Anti-Height Bypass
+            flyG.CFrame = workspace.CurrentCamera.CFrame
+            local moveDir = char.Humanoid.MoveDirection
+            local speed = speedLevels[currentSpeedIdx]
+            flyV.Velocity = (moveDir.Magnitude > 0) and (workspace.CurrentCamera.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z * 1.5)) * speed) or Vector3.new(0, 0.1, 0)
+        end)
+        Fluent:Notify({Title = "Fly", Content = "Eingeschaltet (Speed: " .. speedLevels[currentSpeedIdx] .. ")", Duration = 2})
     else
-        warn("Spieler nicht gefunden oder hat keinen Charakter!")
+        if flyL then flyL:Disconnect() end
+        if flyV then flyV:Destroy() end
+        if flyG then flyG:Destroy() end
+        if char and char:FindFirstChildOfClass("Humanoid") then char.Humanoid.PlatformStand = false end
+        Fluent:Notify({Title = "Fly", Content = "Ausgeschaltet", Duration = 2})
     end
 end
 
+-- Fly Steuerung über Tasten (wie im alten Script)
+game:GetService("UserInputService").InputBegan:Connect(function(input, g)
+    if g then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        ToggleFly()
+    elseif input.KeyCode == Enum.KeyCode.X and flyMode then
+        currentSpeedIdx = (currentSpeedIdx % #speedLevels) + 1
+        Fluent:Notify({Title = "Fly Speed", Content = "Neuer Speed: " .. speedLevels[currentSpeedIdx], Duration = 2})
+    end
+end)
+
+-- --- RESTLICHE FUNKTIONEN (DEIN ORIGINAL CODE) ---
+
+-- Teleport Dropdown
+local selectedPlayerName = nil
 local players = {"Select Player"}
-
-local function updateDropdown()
-    task.wait(0.2)  -- Kleine Verzögerung, um unnötige Updates zu reduzieren
-    Dropdown:SetValues(players)
-end
-
--- Spieler zu Dropdown hinzufügen
-for _, player in ipairs(game.Players:GetPlayers()) do
-    table.insert(players, player.Name)
-end
-
 local Dropdown = DropdownSection:AddDropdown("Dropdown", {
     Title = "Teleport zu Spieler",
-    Description = "Wähle einen Spieler aus",
     Values = players,
     Multi = false,
     Default = 1,
-    Callback = function(value)
-        selectedPlayerName = value
-    end
+    Callback = function(value) selectedPlayerName = value end
 })
 
 DropdownSection:AddButton({
     Title = "Teleport",
-    Description = "Teleportiert dich zum ausgewählten Spieler",
     Callback = function()
-        teleportToPlayer()
+        local target = game.Players:FindFirstChild(selectedPlayerName)
+        if target and target.Character then
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
+        end
     end
 })
 
 -- Spieler-Update-Events
-game.Players.PlayerAdded:Connect(function(player)
-    table.insert(players, player.Name)
+local function updateDropdown() Dropdown:SetValues(players) end
+game.Players.PlayerAdded:Connect(function(p) table.insert(players, p.Name) updateDropdown() end)
+game.Players.PlayerRemoving:Connect(function(p)
+    for i, v in ipairs(players) do if v == p.Name then table.remove(players, i) break end end
     updateDropdown()
 end)
+for _, p in ipairs(game.Players:GetPlayers()) do table.insert(players, p.Name) end
 
-game.Players.PlayerRemoving:Connect(function(player)
-    for i = #players, 1, -1 do
-        if players[i] == player.Name then
-            table.remove(players, i)
-            break
-        end
-    end
-    updateDropdown()
-end)
-
--- EspToggle
-EspSection:AddToggle("MyToggle", {
-    Title = "Esp Toggle", 
-    Description = "Lets you toggle ESP",
+-- ESP
+EspSection:AddToggle("EspToggle", {
+    Title = "Esp Toggle",
     Default = false,
     Callback = function(state)
-        if state then
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20on"))()
-        else
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20off"))()
-        end
+        if state then loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20on"))()
+        else loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20off"))() end
     end 
 })
 
--- Scripts-Buttons
+-- SCRIPTS
 ScriptsSection:AddButton({
     Title = "Banger",
-    Description = "banger script",
-    Callback = function()
-        loadstring(game:HttpGet("https://pastebin.com/raw/pPCkzSJG"))()
-    end
+    Callback = function() loadstring(game:HttpGet("https://pastebin.com/raw/pPCkzSJG"))() end
 })
 
 ScriptsSection:AddButton({
-    Title = "Fly",
-    Description = "F for fly | X for Mode Switch",
+    Title = "Fly Aktivieren",
+    Description = "Aktiviert das interne Fly-System (F zum Starten)",
     Callback = function()
-        local success, response = pcall(function()
-            return game:HttpGet("https://pastebin.com/raw/My57idN9")
-        end)
-
-        if success then
-            print("Skript geladen:", response)
-            local runSuccess, errorMsg = pcall(function()
-                loadstring(response)()
-            end)
-            
-            if not runSuccess then
-                warn("Fehler im Skript: " .. errorMsg)
-            end
-        else
-            warn("Fehler beim Laden des Skripts!")
-        end
-    end
-})
-
--- Voice-Tab Buttons
-VoiceSection:AddButton({
-    Title = "Unban",
-    Description = "Gets you unbanned",
-    Callback = function()
-        local voiceChatService = game:GetService("VoiceChatService")
-        voiceChatService:joinVoice()
+        Fluent:Notify({Title = "Info", Content = "Nutze F zum Fliegen und X für Speed!", Duration = 5})
     end
 })
 
 -- Speed-Slider
-local SpeedSlider = CharacterSection:AddSlider("SpeedSlider", {
-    Title = "Speed",
-    Description = "Set the Speed",
-    Default = 16,
-    Min = 16,
-    Max = 200,
-    Rounding = 1,
-    Callback = function(Value)
-        print("Slider geändert:", Value)
-        getgenv().Enabled = true
-        getgenv().Speed = Value
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/eclipsology/SimpleSpeed/main/SimpleSpeed.lua"))()
-    end
+CharacterSection:AddSlider("SpeedSlider", {
+    Title = "WalkSpeed",
+    Default = 16, Min = 16, Max = 250, Rounding = 1,
+    Callback = function(Value) game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value end
 })
+
+Window:SelectTab(1)
+Fluent:Notify({Title = "omamilch V5", Content = "Turbo Fly (V33) geladen!", Duration = 5})
