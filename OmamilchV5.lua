@@ -1,6 +1,7 @@
 --[[ 
-    OMAMILCH V5 - INTERNAL TURBO (V33)
+    OMAMILCH V5 - STABILITY UPDATE (V34)
     USER: HanfmomentV1 | KEY: HanfmomentV1
+    FIXES: Lag Reduction, Death-Bypass, Physics-Stability
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -20,7 +21,7 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
--- Tabs erstellen
+-- Tabs
 local Tabs = {
     Voice = Window:AddTab({ Title = "Voice", Icon = "mic" }),
     Character = Window:AddTab({ Title = "Character", Icon = "user" }),
@@ -29,62 +30,77 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--- Sections
-local CharacterSection = Tabs.Character:AddSection("Charakter")
-local DropdownSection = Tabs.Misc:AddSection("Teleport")
-local EspSection = Tabs.Misc:AddSection("ESP")
-local ScriptsSection = Tabs.Scripts:AddSection("Scripts")
-
--- --- INTERNE TURBO FLY LOGIK (KEIN PASTEBIN) ---
+-- --- OPTIMIERTE FLY LOGIK (KEIN LAG) ---
 local flyMode = false
-local speedLevels = {50, 150, 400, 800} -- Deutlich schneller als das alte Fly
+local speedLevels = {30, 70, 120, 200} -- Sicherere Geschwindigkeiten gegen Insta-Death
 local currentSpeedIdx = 2
-local flyV, flyG, flyL
+local flyBV, flyBG
 
 local function ToggleFly()
     local lp = game.Players.LocalPlayer
     local char = lp.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     flyMode = not flyMode
     
-    if flyMode and hrp then
-        flyV = Instance.new("BodyVelocity", hrp)
-        flyV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-        flyG = Instance.new("BodyGyro", hrp)
-        flyG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    if flyMode and hrp and hum then
+        -- Bestehende Kräfte löschen
+        if flyBV then flyBV:Destroy() end
+        if flyBG then flyBG:Destroy() end
         
-        flyL = game:GetService("RunService").RenderStepped:Connect(function()
-            char.Humanoid:ChangeState(Enum.HumanoidStateType.Landed) -- Anti-Height Bypass
-            flyG.CFrame = workspace.CurrentCamera.CFrame
-            local moveDir = char.Humanoid.MoveDirection
-            local speed = speedLevels[currentSpeedIdx]
-            flyV.Velocity = (moveDir.Magnitude > 0) and (workspace.CurrentCamera.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z * 1.5)) * speed) or Vector3.new(0, 0.1, 0)
+        flyBV = Instance.new("BodyVelocity", hrp)
+        flyBV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        flyBV.Velocity = Vector3.new(0, 0, 0)
+        
+        flyBG = Instance.new("BodyGyro", hrp)
+        flyBG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+        flyBG.D = 500 -- Dämpfung gegen Zittern/Lag
+        
+        task.spawn(function()
+            while flyMode and char and hrp do
+                local dt = game:GetService("RunService").RenderStepped:Wait()
+                hum:ChangeState(Enum.HumanoidStateType.Landed) -- Anti-Height Kill Bypass
+                
+                flyBG.CFrame = workspace.CurrentCamera.CFrame
+                local moveDir = hum.MoveDirection
+                local speed = speedLevels[currentSpeedIdx]
+                
+                if moveDir.Magnitude > 0 then
+                    flyBV.Velocity = workspace.CurrentCamera.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z * 1.5)) * speed
+                else
+                    flyBV.Velocity = Vector3.new(0, 0.1, 0) -- Schweben ohne Sinken
+                end
+            end
+            -- Aufräumen wenn Fly aus
+            if flyBV then flyBV:Destroy() end
+            if flyBG then flyBG:Destroy() end
+            hum.PlatformStand = false
         end)
-        Fluent:Notify({Title = "Fly", Content = "Eingeschaltet (Speed: " .. speedLevels[currentSpeedIdx] .. ")", Duration = 2})
+        Fluent:Notify({Title = "Fly", Content = "An (Speed: "..speedLevels[currentSpeedIdx]..")", Duration = 2})
     else
-        if flyL then flyL:Disconnect() end
-        if flyV then flyV:Destroy() end
-        if flyG then flyG:Destroy() end
-        if char and char:FindFirstChildOfClass("Humanoid") then char.Humanoid.PlatformStand = false end
-        Fluent:Notify({Title = "Fly", Content = "Ausgeschaltet", Duration = 2})
+        Fluent:Notify({Title = "Fly", Content = "Aus", Duration = 2})
     end
 end
 
--- Fly Steuerung über Tasten (wie im alten Script)
+-- Keybinds
 game:GetService("UserInputService").InputBegan:Connect(function(input, g)
     if g then return end
     if input.KeyCode == Enum.KeyCode.F then
         ToggleFly()
     elseif input.KeyCode == Enum.KeyCode.X and flyMode then
         currentSpeedIdx = (currentSpeedIdx % #speedLevels) + 1
-        Fluent:Notify({Title = "Fly Speed", Content = "Neuer Speed: " .. speedLevels[currentSpeedIdx], Duration = 2})
+        Fluent:Notify({Title = "Fly Speed", Content = "Speed: "..speedLevels[currentSpeedIdx], Duration = 1.5})
     end
 end)
 
 -- --- RESTLICHE FUNKTIONEN (DEIN ORIGINAL CODE) ---
+local CharacterSection = Tabs.Character:AddSection("Charakter")
+local DropdownSection = Tabs.Misc:AddSection("Teleport")
+local EspSection = Tabs.Misc:AddSection("ESP")
+local ScriptsSection = Tabs.Scripts:AddSection("Scripts")
 
--- Teleport Dropdown
+-- Teleport (Optimiert)
 local selectedPlayerName = nil
 local players = {"Select Player"}
 local Dropdown = DropdownSection:AddDropdown("Dropdown", {
@@ -99,13 +115,13 @@ DropdownSection:AddButton({
     Title = "Teleport",
     Callback = function()
         local target = game.Players:FindFirstChild(selectedPlayerName)
-        if target and target.Character then
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
             game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
         end
     end
 })
 
--- Spieler-Update-Events
+-- Dropdown Refresh
 local function updateDropdown() Dropdown:SetValues(players) end
 game.Players.PlayerAdded:Connect(function(p) table.insert(players, p.Name) updateDropdown() end)
 game.Players.PlayerRemoving:Connect(function(p)
@@ -114,7 +130,7 @@ game.Players.PlayerRemoving:Connect(function(p)
 end)
 for _, p in ipairs(game.Players:GetPlayers()) do table.insert(players, p.Name) end
 
--- ESP
+-- ESP & Banger
 EspSection:AddToggle("EspToggle", {
     Title = "Esp Toggle",
     Default = false,
@@ -124,21 +140,11 @@ EspSection:AddToggle("EspToggle", {
     end 
 })
 
--- SCRIPTS
 ScriptsSection:AddButton({
     Title = "Banger",
     Callback = function() loadstring(game:HttpGet("https://pastebin.com/raw/pPCkzSJG"))() end
 })
 
-ScriptsSection:AddButton({
-    Title = "Fly Aktivieren",
-    Description = "Aktiviert das interne Fly-System (F zum Starten)",
-    Callback = function()
-        Fluent:Notify({Title = "Info", Content = "Nutze F zum Fliegen und X für Speed!", Duration = 5})
-    end
-})
-
--- Speed-Slider
 CharacterSection:AddSlider("SpeedSlider", {
     Title = "WalkSpeed",
     Default = 16, Min = 16, Max = 250, Rounding = 1,
@@ -146,4 +152,4 @@ CharacterSection:AddSlider("SpeedSlider", {
 })
 
 Window:SelectTab(1)
-Fluent:Notify({Title = "omamilch V5", Content = "Turbo Fly (V33) geladen!", Duration = 5})
+Fluent:Notify({Title = "omamilch V5", Content = "Lag-Fix V34 geladen!", Duration = 5})
