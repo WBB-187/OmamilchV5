@@ -1,126 +1,173 @@
---[[ 
-    OMAMILCH V5 - OFFICIAL INTERFACE (V27)
-    USER: HanfmomentV1 | KEY: HanfmomentV1
-    STATUS: VISUAL BYPASS ACTIVE (NO FAKE LABELS)
-]]
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
-if _G.OM_RUNNING then _G.OM_RUNNING = false end
-task.wait(0.2)
-_G.OM_RUNNING = true
+local Window = Fluent:CreateWindow({
+    Title = "OmamilchV5" .. Fluent.Version,
+    SubTitle = "by bmw3blitz",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(460, 360),
+    Acrylic = false, -- Blur ausschalten = false
+    Theme = "Amethyst",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
 
-local lp = game:GetService("Players").LocalPlayer
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
-local Cam = workspace.CurrentCamera
+-- Tabs erstellen
+local Tabs = {
+    Voice = Window:AddTab({ Title = "Voice", Icon = "mic" }),
+    Character = Window:AddTab({ Title = "Character", Icon = "user" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "component" }),
+    Scripts = Window:AddTab({ Title = "Scripts", Icon = "scroll" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
 
--- Offizielle Start-Sequenz
-pcall(function()
-    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("omamilch V5 Ist An", "All")
-end)
+-- Sections
+local VoiceSection = Tabs.Voice:AddSection("Voice")
+local CharacterSection = Tabs.Character:AddSection("Charakter")
+local DropdownSection = Tabs.Misc:AddSection("Teleport")
+local EspSection = Tabs.Misc:AddSection("ESP")
+local ScriptsSection = Tabs.Scripts:AddSection("Scripts")
+local VersionSection = Tabs.Settings:AddSection("Version")
+local CreditSection = Tabs.Settings:AddSection("Credits")
 
-local function InitV27()
-    local SG = Instance.new("ScreenGui")
-    SG.Name = "HDAdminInterface" -- Name aus deinen Screenshots übernommen
-    pcall(function() SG.Parent = game:GetService("CoreGui") or lp:WaitForChild("PlayerGui") end)
+-- Spieler Teleport Dropdown
+local selectedPlayerName = nil
 
-    -- --- CMDR CONSOLE (AUTHENTIC LOOK) ---
-    local CmdrFrame = Instance.new("Frame", SG)
-    CmdrFrame.Size = UDim2.new(1, 0, 0, 35); CmdrFrame.Position = UDim2.new(0, 0, 0, -35)
-    CmdrFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); CmdrFrame.Visible = false
-    local CmdrText = Instance.new("TextBox", CmdrFrame)
-    CmdrText.Size = UDim2.new(1, -20, 1, 0); CmdrText.Position = UDim2.new(0, 10, 0, 0)
-    CmdrText.BackgroundTransparency = 1; CmdrText.TextColor3 = Color3.new(1,1,1); CmdrText.Text = "> "
-    CmdrText.TextXAlignment = Enum.TextXAlignment.Left; CmdrText.Font = Enum.Font.Code
-
-    -- --- MAIN PANEL (SUPREME RED) ---
-    local MF = Instance.new("Frame", SG)
-    MF.Size = UDim2.new(0, 800, 0, 500); MF.Position = UDim2.new(0.5, -400, 0.5, -250)
-    MF.BackgroundColor3 = Color3.fromRGB(5, 0, 0); MF.Active, MF.Draggable = true, true
-    Instance.new("UIStroke", MF).Color = Color3.fromRGB(255, 0, 0)
-    
-    -- Sterne Deko
-    for i = 1, 30 do
-        local s = Instance.new("TextLabel", MF)
-        s.Text = "★"; s.TextColor3 = Color3.fromRGB(255, 0, 0); s.BackgroundTransparency = 1
-        s.Position = UDim2.new(math.random(), 0, math.random(), 0)
+local function teleportToPlayer()
+    if not selectedPlayerName or selectedPlayerName == "Select Player" then
+        warn("Kein gültiger Spieler ausgewählt!")
+        return
     end
 
-    local Content = Instance.new("ScrollingFrame", MF)
-    Content.Size = UDim2.new(1, -20, 1, -100); Content.Position = UDim2.new(0, 10, 0, 20)
-    Content.BackgroundTransparency = 1; Content.CanvasSize = UDim2.new(0, 0, 4, 0)
-    Instance.new("UIListLayout", Content).Padding = UDim.new(0, 8)
+    local player = game.Players:FindFirstChild(selectedPlayerName)
+    if player and player.Character then
+        local character = player.Character
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local playerHRP = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-    local function AddBtn(name, callback)
-        local b = Instance.new("TextButton", Content)
-        b.Size = UDim2.new(1, -10, 0, 50); b.Text = name; b.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
-        b.TextColor3 = Color3.new(1, 1, 1); b.Font = Enum.Font.GothamBold; Instance.new("UICorner", b)
-        b.MouseButton1Click:Connect(function() pcall(callback) end)
-    end
-
-    -- --- ADMIN COMMANDS ---
-
-    -- Fly System (Vollständige 360° Kontrolle)
-    local flyV, flyG, flyL
-    AddBtn("ADMIN FLY (ACTIVE)", function()
-        _G.HD_Fly = not _G.HD_Fly
-        if _G.HD_Fly then
-            local hrp = lp.Character.HumanoidRootPart
-            flyV = Instance.new("BodyVelocity", hrp); flyV.MaxForce = Vector3.new(1e9,1e9,1e9)
-            flyG = Instance.new("BodyGyro", hrp); flyG.MaxTorque = Vector3.new(1e9,1e9,1e9)
-            flyL = RS.RenderStepped:Connect(function()
-                lp.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-                flyG.CFrame = Cam.CFrame
-                local moveDir = lp.Character.Humanoid.MoveDirection
-                flyV.Velocity = (moveDir.Magnitude > 0) and (Cam.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z * 1.5)) * 180) or Vector3.new(0, 0.1, 0)
-            end)
+        if hrp and playerHRP then
+            playerHRP.CFrame = hrp.CFrame  -- Teleportiere dich zum Spieler
         else
-            if flyL then flyL:Disconnect() end; if flyV then flyV:Destroy() end; if flyG then flyG:Destroy() end
+            warn("HumanoidRootPart nicht gefunden!")
         end
-    end)
-
-    AddBtn("ENHANCED NOCLIP", function()
-        _G.NC = not _G.NC
-        RS.Stepped:Connect(function()
-            if _G.NC and lp.Character then
-                for _, v in pairs(lp.Character:GetDescendants()) do
-                    if v:IsA("BasePart") and v.CanCollide and v.Name ~= "HumanoidRootPart" then
-                        v.CanCollide = false
-                    end
-                end
-            end
-        end)
-    end)
-
-    AddBtn("CMD INTERFACE", function()
-        CmdrFrame.Visible = not CmdrFrame.Visible
-        CmdrFrame:TweenPosition(CmdrFrame.Visible and UDim2.new(0,0,0,0) or UDim2.new(0,0,0,-35), "Out", "Quart", 0.2)
-    end)
-
-    AddBtn("SERVER BYPASS (GODMODE)", function()
-        RS.Heartbeat:Connect(function()
-            if lp.Character and lp.Character:FindFirstChild("Humanoid") then
-                lp.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-                if lp.Character.HumanoidRootPart.Position.Y < -45 then
-                    lp.Character.HumanoidRootPart.CFrame = CFrame.new(lp.Character.HumanoidRootPart.Position.X, 15, lp.Character.HumanoidRootPart.Position.Z)
-                end
-            end
-        end)
-    end)
-
-    -- FOOTER
-    local Info = Instance.new("TextLabel", MF)
-    Info.Size = UDim2.new(1, 0, 0, 40); Info.Position = UDim2.new(0, 0, 1, -45)
-    Info.BackgroundTransparency = 1; Info.TextColor3 = Color3.fromRGB(255, 0, 0); Info.Font = Enum.Font.GothamBold
-    Info.Text = "ADMIN PANEL | HanfmomentV1 | TOGGLE: F3"
-
-    -- F3 & F2 Steuerung
-    UIS.InputBegan:Connect(function(i, g)
-        if not g and i.KeyCode == Enum.KeyCode.F3 then MF.Visible = not MF.Visible end
-        if not g and i.KeyCode == Enum.KeyCode.F2 then 
-            CmdrFrame.Visible = not CmdrFrame.Visible
-            CmdrFrame:TweenPosition(CmdrFrame.Visible and UDim2.new(0,0,0,0) or UDim2.new(0,0,0,-35), "Out", "Quart", 0.2)
-        end
-    end)
+    else
+        warn("Spieler nicht gefunden oder hat keinen Charakter!")
+    end
 end
 
-task.delay(0.5, function() pcall(InitV27) end)
+local players = {"Select Player"}
+
+local function updateDropdown()
+    task.wait(0.2)  -- Kleine Verzögerung, um unnötige Updates zu reduzieren
+    Dropdown:SetValues(players)
+end
+
+-- Spieler zu Dropdown hinzufügen
+for _, player in ipairs(game.Players:GetPlayers()) do
+    table.insert(players, player.Name)
+end
+
+local Dropdown = DropdownSection:AddDropdown("Dropdown", {
+    Title = "Teleport zu Spieler",
+    Description = "Wähle einen Spieler aus",
+    Values = players,
+    Multi = false,
+    Default = 1,
+    Callback = function(value)
+        selectedPlayerName = value
+    end
+})
+
+DropdownSection:AddButton({
+    Title = "Teleport",
+    Description = "Teleportiert dich zum ausgewählten Spieler",
+    Callback = function()
+        teleportToPlayer()
+    end
+})
+
+-- Spieler-Update-Events
+game.Players.PlayerAdded:Connect(function(player)
+    table.insert(players, player.Name)
+    updateDropdown()
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+    for i = #players, 1, -1 do
+        if players[i] == player.Name then
+            table.remove(players, i)
+            break
+        end
+    end
+    updateDropdown()
+end)
+
+-- EspToggle
+EspSection:AddToggle("MyToggle", {
+    Title = "Esp Toggle", 
+    Description = "Lets you toggle ESP",
+    Default = false,
+    Callback = function(state)
+        if state then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20on"))()
+        else
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20off"))()
+        end
+    end 
+})
+
+-- Scripts-Buttons
+ScriptsSection:AddButton({
+    Title = "Banger",
+    Description = "banger script",
+    Callback = function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/pPCkzSJG"))()
+    end
+})
+
+ScriptsSection:AddButton({
+    Title = "Fly",
+    Description = "F for fly | X for Mode Switch",
+    Callback = function()
+        local success, response = pcall(function()
+            return game:HttpGet("https://pastebin.com/raw/My57idN9")
+        end)
+
+        if success then
+            print("Skript geladen:", response)
+            local runSuccess, errorMsg = pcall(function()
+                loadstring(response)()
+            end)
+            
+            if not runSuccess then
+                warn("Fehler im Skript: " .. errorMsg)
+            end
+        else
+            warn("Fehler beim Laden des Skripts!")
+        end
+    end
+})
+
+-- Voice-Tab Buttons
+VoiceSection:AddButton({
+    Title = "Unban",
+    Description = "Gets you unbanned",
+    Callback = function()
+        local voiceChatService = game:GetService("VoiceChatService")
+        voiceChatService:joinVoice()
+    end
+})
+
+-- Speed-Slider
+local SpeedSlider = CharacterSection:AddSlider("SpeedSlider", {
+    Title = "Speed",
+    Description = "Set the Speed",
+    Default = 16,
+    Min = 16,
+    Max = 200,
+    Rounding = 1,
+    Callback = function(Value)
+        print("Slider geändert:", Value)
+        getgenv().Enabled = true
+        getgenv().Speed = Value
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/eclipsology/SimpleSpeed/main/SimpleSpeed.lua"))()
+    end
+})
