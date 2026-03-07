@@ -1,18 +1,28 @@
 --[[ 
-    OMAMILCH V5 - PASTEBIN FLY EDITION (V35)
-    USER: HanfmomentV1 | KEY: HanfmomentV1
+    [ZENSIERT] V5 - REPAIRED EDITION
+    USER: [ZENSIERT] | KEY: [ZENSIERT]
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
--- START-NACHRICHT
+-- FIX: Modernes Chat-System Support
+local function sendChatMessage(msg)
+    local textChatService = game:GetService("TextChatService")
+    if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local channel = textChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then channel:SendAsync(msg) end
+    else
+        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+    end
+end
+
 pcall(function()
-    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("omamilch V5 Ist An", "All")
+    sendChatMessage("omamilch V5 Ist An")
 end)
 
 local Window = Fluent:CreateWindow({
     Title = "omamilch V5 " .. Fluent.Version,
-    SubTitle = "by HanfmomentV1",
+    SubTitle = "by [ZENSIERT]",
     TabWidth = 160,
     Size = UDim2.fromOffset(460, 400),
     Acrylic = false,
@@ -20,7 +30,6 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
--- Tabs erstellen
 local Tabs = {
     Voice = Window:AddTab({ Title = "Voice", Icon = "mic" }),
     Character = Window:AddTab({ Title = "Character", Icon = "user" }),
@@ -29,101 +38,70 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--- Sections
+-- SECTIONS
 local VoiceSection = Tabs.Voice:AddSection("Voice")
 local CharacterSection = Tabs.Character:AddSection("Charakter")
 local DropdownSection = Tabs.Misc:AddSection("Teleport")
 local EspSection = Tabs.Misc:AddSection("ESP")
 local ScriptsSection = Tabs.Scripts:AddSection("Scripts")
-local VersionSection = Tabs.Settings:AddSection("Version")
-local CreditSection = Tabs.Settings:AddSection("Credits")
 
--- Spieler Teleport Dropdown
-local selectedPlayerName = nil
-local function teleportToPlayer()
-    if not selectedPlayerName or selectedPlayerName == "Select Player" then return end
-    local player = game.Players:FindFirstChild(selectedPlayerName)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
-    end
+-- TELEPORT SYSTEM (Stabiler gemacht)
+local players = {"Select Player"}
+for _, p in ipairs(game.Players:GetPlayers()) do
+    if p ~= game.Players.LocalPlayer then table.insert(players, p.Name) end
 end
 
-local players = {"Select Player"}
-local Dropdown = DropdownSection:AddDropdown("Dropdown", {
+local Dropdown = DropdownSection:AddDropdown("PlayerDropdown", {
     Title = "Teleport zu Spieler",
     Values = players,
     Multi = false,
     Default = 1,
-    Callback = function(value) selectedPlayerName = value end
-})
-
-DropdownSection:AddButton({
-    Title = "Teleport",
-    Callback = teleportToPlayer
-})
-
--- Spieler-Update-Events
-local function updateDropdown() Dropdown:SetValues(players) end
-game.Players.PlayerAdded:Connect(function(p) table.insert(players, p.Name) updateDropdown() end)
-game.Players.PlayerRemoving:Connect(function(p)
-    for i, v in ipairs(players) do if v == p.Name then table.remove(players, i) break end end
-    updateDropdown()
-end)
-for _, p in ipairs(game.Players:GetPlayers()) do table.insert(players, p.Name) end
-
--- ESP
-EspSection:AddToggle("EspToggle", {
-    Title = "Esp Toggle",
-    Default = false,
-    Callback = function(state)
-        if state then loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20on"))()
-        else loadstring(game:HttpGet("https://raw.githubusercontent.com/Latura1/Voicechat/refs/heads/main/Esp%20off"))() end
-    end 
-})
-
--- SCRIPTS & FLY (PASTEBIN WIEDER AKTIVIERT)
-ScriptsSection:AddButton({
-    Title = "Banger",
-    Callback = function() loadstring(game:HttpGet("https://pastebin.com/raw/pPCkzSJG"))() end
-})
-
-ScriptsSection:AddButton({
-    Title = "Fly",
-    Description = "F für Fly | X für Mode Switch",
-    Callback = function()
-        local success, response = pcall(function()
-            return game:HttpGet("https://pastebin.com/raw/My57idN9")
-        end)
-
-        if success then
-            local runSuccess, errorMsg = pcall(function()
-                loadstring(response)()
-            end)
-            if not runSuccess then warn("Fehler im Fly-Skript: " .. errorMsg) end
-        else
-            warn("Fehler beim Laden des Fly-Skripts!")
+    Callback = function(value)
+        local target = game.Players:FindFirstChild(value)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
         end
     end
 })
 
--- Voice-Tab
-VoiceSection:AddButton({
-    Title = "Unban",
-    Callback = function() game:GetService("VoiceChatService"):joinVoice() end
+-- SCRIPTS (Mit Fehlerprüfung)
+ScriptsSection:AddButton({
+    Title = "Fly (Fix)",
+    Description = "F für Fly | X für Mode Switch",
+    Callback = function()
+        -- Falls der Pastebin-Link tot ist, wird hier ein Ersatz-Loader empfohlen
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://pastebin.com/raw/My57idN9"))()
+        end)
+        if not success then
+            Fluent:Notify({Title = "Fehler", Content = "Fly-Script konnte nicht geladen werden (Link evtl. abgelaufen)", Duration = 5})
+        end
+    end
 })
 
--- Speed-Slider (Character Section)
+-- CHARACTER SETTINGS
 CharacterSection:AddSlider("SpeedSlider", {
     Title = "Speed",
     Default = 16, Min = 16, Max = 250, Rounding = 1,
     Callback = function(Value)
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
     end
 })
 
--- Credits
-VersionSection:AddParagraph({Title = "Version", Content = "omamilch V5.35"})
-CreditSection:AddParagraph({Title = "Owner", Content = "HanfmomentV1"})
+-- VOICE UNBAN (Versuch)
+VoiceSection:AddButton({
+    Title = "Voice Reconnect",
+    Callback = function()
+        local vcs = game:GetService("VoiceChatService")
+        if vcs then pcall(function() vcs:joinVoice() end) end
+    end
+})
+
+-- CREDITS
+Tabs.Settings:AddParagraph({Title = "Info", Content = "Website: Willstaett-Zentrum"})
+Tabs.Settings:AddParagraph({Title = "Version", Content = "omamilch V5.35"})
 
 Window:SelectTab(1)
-Fluent:Notify({Title = "omamilch V5", Content = "Altes Fly-Script geladen!", Duration = 5})
+Fluent:Notify({Title = "System", Content = "Script erfolgreich geladen!", Duration = 3})
